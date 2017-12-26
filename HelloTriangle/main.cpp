@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <functional>
 #include <vector>
+#include <set>
 #include <string.h>
 
 const int WIDTH = 800;
@@ -65,6 +66,11 @@ private:
   VkDevice device;
   // Graphics Queue Handle
   VkQueue graphicsQueue;
+  // Vulkan Window Surface Interface to render onto
+  VkSurfaceKHR surface;
+  // Presentation Queue Handle
+  VkQueue presentQueue;
+  
   
   // Function encapsulating the code needed to create a window using GLFW
   void initWindow(){
@@ -86,6 +92,7 @@ private:
   void initVulkan() {
     createInstance();
     setupDebugCallback();
+    createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
   }
@@ -101,7 +108,9 @@ private:
   void cleanup() {
     vkDestroyDevice(device, nullptr);
     DestroyDebugReportCallbackEXT(instance, callback, nullptr);
+    vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
+
     
     glfwDestroyWindow(window);
 
@@ -284,9 +293,10 @@ private:
   
   struct QueueFamilyIndices {
     int graphicsFamily = -1;
-
+    int presentFamily = -1;
+    
     bool isComplete(){
-      return graphicsFamily >= 0;
+      return graphicsFamily >= 0 && presentFamily >= 0;
     }
   };
 
@@ -304,12 +314,19 @@ private:
 	indices.graphicsFamily = i;
       }
 
+      VkBool32 presentSupport = false;
+      vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+      if (queueFamily.queueCount > 0 && presentSupport){
+	indices.presentFamily = i;
+      }
+      
       if (indices.isComplete()){
 	break;
       }
       
       i++;
     }
+
     
     return indices;
   }
@@ -327,19 +344,25 @@ private:
   void createLogicalDevice(){
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
-    queueCreateInfo.queueCount = 1;
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::set<int> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily};
+
     float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    for (int queueFamily : uniqueQueueFamilies){
+      VkDeviceQueueCreateInfo queueCreateInfo = {};
+      queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+      queueCreateInfo.queueFamilyIndex = queueFamily;
+      queueCreateInfo.queueCount = 1;
+      queueCreateInfo.pQueuePriorities = &queuePriority;
+      queueCreateInfos.push_back(queueCreateInfo);
+    }
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
     VkDeviceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = 0;
 
@@ -355,9 +378,17 @@ private:
     }
 
     vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+    vkGetDeviceQueue(device, indices.presentFamily, 0, &presentQueue);
   }
   
 
+  /////////////////////// Window Surface Creation /////////////////////////////////
+
+  void createSurface(){
+    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS){
+      throw std::runtime_error("failed to create window surface!");
+    }
+  }
   
 };
 
