@@ -61,7 +61,10 @@ private:
   VkDebugReportCallbackEXT callback;
   // Vulkan Physical Device
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-
+  // Vulkan Logical Device
+  VkDevice device;
+  // Graphics Queue Handle
+  VkQueue graphicsQueue;
   
   // Function encapsulating the code needed to create a window using GLFW
   void initWindow(){
@@ -84,6 +87,7 @@ private:
     createInstance();
     setupDebugCallback();
     pickPhysicalDevice();
+    createLogicalDevice();
   }
 
   
@@ -95,6 +99,7 @@ private:
 
   
   void cleanup() {
+    vkDestroyDevice(device, nullptr);
     DestroyDebugReportCallbackEXT(instance, callback, nullptr);
     vkDestroyInstance(instance, nullptr);
     
@@ -315,6 +320,43 @@ private:
     
     return indices.isComplete();
   }
+
+
+  /////////////////////////////// Logical Device Creation //////////////////////////////////
+
+  void createLogicalDevice(){
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
+    queueCreateInfo.queueCount = 1;
+    float queuePriority = 1.0f;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+
+    VkDeviceCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos = &queueCreateInfo;
+    createInfo.queueCreateInfoCount = 1;
+    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.enabledExtensionCount = 0;
+
+    if (enableValidationLayers) {
+      createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+      createInfo.ppEnabledLayerNames = validationLayers.data();
+    } else {
+      createInfo.enabledLayerCount = 0;
+    }
+
+    if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS){
+      throw std::runtime_error("failed to create logical device!");
+    }
+
+    vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+  }
+  
 
   
 };
