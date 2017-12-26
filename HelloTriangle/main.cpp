@@ -314,7 +314,7 @@ private:
 	indices.graphicsFamily = i;
       }
 
-      VkBool32 presentSupport = false;
+OA      VkBool32 presentSupport = false;
       vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
       if (queueFamily.queueCount > 0 && presentSupport){
 	indices.presentFamily = i;
