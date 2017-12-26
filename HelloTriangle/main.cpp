@@ -55,13 +55,14 @@ private:
   
   // Window containing our application
   GLFWwindow* window;
+  // Instance of the Vulkan APU
   VkInstance instance;
+  // Debugging Callback
   VkDebugReportCallbackEXT callback;
+  // Vulkan Physical Device
+  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
   
-
-
-
-
   // Function encapsulating the code needed to create a window using GLFW
   void initWindow(){
     // Initializes the window to be created
@@ -77,18 +78,13 @@ private:
   }
 
 
-
-
-
   // Function encapsulating the code needed to create all the Vulkan
   // objects that we will be using
   void initVulkan() {
     createInstance();
     setupDebugCallback();
+    pickPhysicalDevice();
   }
-
-
-
 
   
   void mainLoop() {
@@ -96,9 +92,6 @@ private:
       glfwPollEvents();
     }
   }
-
-
-
 
   
   void cleanup() {
@@ -112,6 +105,7 @@ private:
 
 
 
+  //////////////////////////// Vulkan API Instance Creation ////////////////////////////
 
   
   // Function to create an instance of the Vulkan API
@@ -155,7 +149,22 @@ private:
   }
 
 
+  std::vector<const char*> getRequiredExtensions(){
+    std::vector<const char*> extensions;
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
+    for (uint32_t i = 0; i < glfwExtensionCount; i++){
+      extensions.push_back(glfwExtensions[i]);
+    }
+
+    if (enableValidationLayers){
+      extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    }
+
+    return extensions;
+  }
 
   
   // Checks if necessary extensions are available
@@ -180,9 +189,9 @@ private:
     return true;
   }
 
+  
 
-
-
+  //////////////////////////// Validation Layer/Callback Creation /////////////////////////
   
   bool checkValidationLayerSupport(){
     uint32_t layerCount;
@@ -208,32 +217,8 @@ private:
 
     return true;
   }
-
-
-
-
-
-  std::vector<const char*> getRequiredExtensions(){
-    std::vector<const char*> extensions;
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-    for (uint32_t i = 0; i < glfwExtensionCount; i++){
-      extensions.push_back(glfwExtensions[i]);
-    }
-
-    if (enableValidationLayers){
-      extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    }
-
-    return extensions;
-  }
-
-
-
-
-
+  
+  
   void setupDebugCallback(){
     if (!enableValidationLayers) return;
 
@@ -246,10 +231,7 @@ private:
       throw std::runtime_error("failed to setup debug callback");
     }
   }
-
-
   
-
 
   static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugReportFlagsEXT flags,
@@ -265,6 +247,75 @@ private:
   
     return VK_FALSE;
   }
+
+
+
+  
+  ////////////////////////// Physical Device Selection ///////////////////////////////
+
+  void pickPhysicalDevice(){
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+    if (deviceCount == 0){
+      throw std::runtime_error("failed to find GPUs with Vulkan support!");
+    }
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+    for (const auto& device : devices){
+      if (isDeviceSuitable(device)){
+	physicalDevice = device;
+	break;
+      }
+    }
+
+    if (physicalDevice == VK_NULL_HANDLE){
+      throw std::runtime_error("failed to find a suitable GPU!");
+    }
+  }
+  
+  
+  struct QueueFamilyIndices {
+    int graphicsFamily = -1;
+
+    bool isComplete(){
+      return graphicsFamily >= 0;
+    }
+  };
+
+  QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device){
+    QueueFamilyIndices indices;
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto& queueFamily : queueFamilies) {
+      if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT){
+	indices.graphicsFamily = i;
+      }
+
+      if (indices.isComplete()){
+	break;
+      }
+      
+      i++;
+    }
+    
+    return indices;
+  }
+
+  
+  bool isDeviceSuitable(VkPhysicalDevice device){
+    QueueFamilyIndices indices = findQueueFamilies(device);
+    
+    return indices.isComplete();
+  }
+
   
 };
 
