@@ -583,7 +583,7 @@ private:
       createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
       createInfo.subresourceRange.baseMipLevel = 0;
       createInfo.subresourceRange.levelCount = 1;
-      createInfo.subresourceRange.BaseArrayLayer = 0;
+      createInfo.subresourceRange.baseArrayLayer = 0;
       createInfo.subresourceRange.layerCount = 1;
 
       if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS){
