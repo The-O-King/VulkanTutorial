@@ -1,5 +1,6 @@
 VULKAN_SDK_PATH = /home/omar/VulkanSDK/1.0.65.0/x86_64
-CFLAGS = -std=c++11 -I$(VULKAN_SDK_PATH)/include
+STB_INCLUDE_PATH = .
+CFLAGS = -std=c++11 -I$(VULKAN_SDK_PATH)/include -I$(STB_INCLUDE_PATH)
 LDFLAGS = -L$(VULKAN_SDK_PATH)/lib `pkg-config --static --libs glfw3` -lvulkan
 
 VulkanTest: main.cpp
